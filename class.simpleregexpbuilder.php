@@ -2,43 +2,46 @@
 
 class SimpleRegexpBuilder {
 
-    protected $pattern = '';
-    public $opts = array('i' => true, 'encoding' => 'utf8', 'delimiter' => '/', 'b' => true); /* i: not case sensitive, encoding: string in array encoding, delimiter: start and end character, b: bounary */
+    protected $p = '';
+    public $opts = array('i' => true, 'e' => 'utf8', 'd' => '/', 'b' => true, 'r' => false); /* i: not case sensitive, e: encoding of string in array, d: delimiter, start and end character, b: bounary, r: created pattern will be reusable */
     protected $_u = ''; # i18n need
+    protected $esc = '[\^$.|?*+()';
 
     public function __construct(array $words, array $opts = array()) {
         $this->opts = $opts + $this->opts;
-        $this->pattern = $this->opts['delimiter'] . ($this->opts['b'] ? '\b' : '') . substr($this->g(call_user_func_array('array_merge_recursive', array_map(array($this, 't'), $words))), 3, -1) . ($this->opts['b'] ? '\b' : '') . $this->opts['delimiter'] . $this->_u . ($this->opts['i'] ? 'i' : '') . 'S';
+        $this->esc .= $this->opts['d'];
+        $this->p = $this->opts['d'] . ($this->opts['b'] ? '\b' : '') . $this->g(call_user_func_array('array_merge_recursive', array_map(array($this, 't'), $words))) . ($this->opts['b'] ? '\b' : '') . $this->opts['d'] . $this->_u . ($this->opts['i'] ? 'i' : '') . ($this->opts['r'] ? 'S' : '');
     }
 
-    protected function t($str) {
-        $c = mb_substr($str, 0, 1, $this->opts['encoding']);
+    protected function t($s) {
+        $c = mb_substr($s, 0, 1, $this->opts['e']);
         if (strlen($c) > 1)
             $this->_u = 'u';
         else if ($this->opts['i'])
             $c = strtolower($c);
-        return array($c => mb_strlen($str, $this->opts['encoding']) > 1 ? $this->t(mb_substr($str, 1, mb_strlen($str, $this->opts['encoding']), $this->opts['encoding'])) : array('' => ''));
+        return array($c => mb_strlen($s, $this->opts['e']) > 1 ? $this->t(mb_substr($s, 1, mb_strlen($s, $this->opts['e']), $this->opts['e'])) : array('' => ''));
     }
 
-    protected function g(array $tree, $level = 0) {
-        $ret = array();
-        foreach ($tree as $node => $cnode)
-            if ($node != '')
-                $ret[] = $node . ($cnode == array('' => '') ? '' : $this->g($cnode, $level + 1));
-        $b = isset($tree['']);
-        return ((count($ret) > 1 || (mb_strlen($ret[0], $this->opts['encoding']) > 1 && $b) || !$level ? '(?:' . join(($this->opts['b'] && !$level ? '\b|\b' : '|'), $ret) . ')' : $ret[0]) . ($b ? '?' : ''));
+    protected function g(array $t, $x = 0) {
+        $r = array();
+        $i = 0;
+        foreach ($t as $c => $a)
+            if ($c != '')
+                $r[] = (strpos($this->esc, $c) === false ? '' : '\\') . $c . ($a == array('' => '') ? '' : (++$i ? $this->g($a, $x + 1) : ''));
+        $b = isset($t['']);
+        return ((count($r) > 1 || $i && $b) ? '(' . ($x ? '?:' : '') . join('|', $r) . ')' : ($x ? $r[0] : '(' . $r[0] . ')')) . ($b ? '?' : '');
     }
 
     public function getRegexp() {
-        return $this->pattern;
+        return $this->p;
     }
 
-    public function match($str, &$m) {
-        return preg_match($this->pattern, $str, $m);
+    public function match($s, &$m) {
+        return preg_match($this->p, $s, $m);
     }
 
-    public function matchAll($str, array &$m) {
-        return preg_match_all($this->pattern, $str, $ret) ? count($m = $ret[0]) : 0;
+    public function matchAll($s, array &$m) {
+        return preg_match_all($this->p, $s, $r) ? count($m = $r[0]) : 0;
     }
 
 }
