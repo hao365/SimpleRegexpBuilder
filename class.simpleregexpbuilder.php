@@ -1,5 +1,8 @@
 <?php
-
+/*
+ * Author: fq.gao@hao365.com
+ * GPL License
+ */
 class SimpleRegexpBuilder {
 
     protected $p = '';
